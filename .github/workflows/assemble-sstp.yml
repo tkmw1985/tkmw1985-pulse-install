@@ -1,0 +1,28 @@
+name: assemble encrypted SSTP distribution
+on:
+  push:
+    branches: ['stage/sstp-profiles']
+    paths: ['.github/workflows/assemble-sstp.yml']
+permissions:
+  contents: write
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble verified encrypted package
+        run: |
+          set -eu
+          [ "$(find stage-sstp -name 'chunk-*' | wc -l)" = 16 ]
+          cat stage-sstp/chunk-* | base64 -d > openvpn-xor-install-aarch64.sh.enc
+          [ "$(wc -c < openvpn-xor-install-aarch64.sh.enc)" = 9097760 ]
+          [ "$(git hash-object openvpn-xor-install-aarch64.sh.enc)" = 1441e01274d61c4bca36703071d800bd12131c0f ]
+          WANT=$(awk '{print $1}' stage-sstp/encrypted.sha256)
+          [ "$(sha256sum openvpn-xor-install-aarch64.sh.enc | awk '{print $1}')" = "$WANT" ]
+          cp stage-sstp/manifest.txt manifest.txt
+          [ "$(wc -l < manifest.txt)" = 1 ]
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add openvpn-xor-install-aarch64.sh.enc manifest.txt
+          git commit -m 'Assemble verified encrypted SSTP profiles'
+          git push origin HEAD:stage/sstp-profiles
